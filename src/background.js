@@ -1,18 +1,53 @@
-// `browser` is the standardised interface for Web Extensions, but Chrome
-// doesn't support that yet.
-const _browser = typeof browser !== 'undefined' ? browser : chrome
+// Background service worker for Key Jump extension
 
-_browser.runtime.onMessage.addListener(async (request) => {
-  const url = request?.openUrlInNewTab
-  if (typeof url === 'string' && url) {
-    _browser.tabs.query({active: true, currentWindow: true}, ([currentTab]) => {
-      _browser.storage.sync.get('activateNewTab', (options) => {
-        _browser.tabs.create({
-          url,
-          index: currentTab.index + 1,
-          active: options.activateNewTab,
-        })
-      })
-    })
+// Handle messages from content scripts
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.type === 'getSettings') {
+    chrome.storage.sync.get(['keyJumpSettings'], (result) => {
+      sendResponse(result.keyJumpSettings || {});
+    });
+    return true; // Keep message channel open for async response
   }
-})
+  
+  if (request.type === 'saveSettings') {
+    chrome.storage.sync.set({ keyJumpSettings: request.settings }, () => {
+      sendResponse({ success: true });
+    });
+    return true; // Keep message channel open for async response
+  }
+  
+  if (request.openUrlInNewTab) {
+    chrome.tabs.create({ url: request.openUrlInNewTab });
+    sendResponse({ success: true });
+    return true;
+  }
+});
+
+// Handle extension installation
+chrome.runtime.onInstalled.addListener(() => {
+  // Set default settings
+  chrome.storage.sync.get(['keyJumpSettings'], (result) => {
+    if (!result.keyJumpSettings) {
+      chrome.storage.sync.set({
+        keyJumpSettings: {
+          enabled: true,
+          shortcuts: {
+            next: 'j',
+            prev: 'k',
+            activate: 'Enter',
+            clear: 'Escape'
+          }
+        }
+      });
+    }
+  });
+});
+
+// Handle browser action clicks (if needed for additional functionality)
+chrome.action.onClicked.addListener((tab) => {
+  // Optional: inject content script programmatically if needed
+  chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['content.js']
+  });
+});

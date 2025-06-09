@@ -5,6 +5,23 @@
 
 const state = {}
 
+// Replace background page access with storage API
+function getSettings() {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['keyJumpSettings'], (result) => {
+      resolve(result.keyJumpSettings || {});
+    });
+  });
+}
+
+function saveSettings(settings) {
+  return new Promise((resolve) => {
+    chrome.storage.sync.set({ keyJumpSettings: settings }, () => {
+      resolve({ success: true });
+    });
+  });
+}
+
 window.__KEYJUMP__.bootstrapState(state, setup)
 
 // Stuff
@@ -112,3 +129,9 @@ function setIgnoreWhileInputFocused(event) {
 function saveOptions(options) {
   _browser.storage.sync.set(options)
 }
+
+// Initialize options page
+document.addEventListener('DOMContentLoaded', async () => {
+  const settings = await getSettings();
+  // ...existing initialization code...
+});

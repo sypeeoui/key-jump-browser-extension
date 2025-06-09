@@ -1,8 +1,8 @@
 {
   "name": "key-jump-browser-extension",
-  "version": "5.4.0",
+  "version": "5.4.1",
   "description": "Easier keyboard navigation. No mouse needed to click on links and stuff.",
-  "author": "Kenneth Sundqvist <kenneth@kesu.se> (kesu.se)",
+  "author": "Kenneth Sundqvist <kenneth@kesu.se> (kesu.se), Su Qi Chen <sypeeoui@gmail.com>",
   "license": "MIT",
   "private": true,
   "scripts": {

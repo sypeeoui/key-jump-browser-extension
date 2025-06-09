@@ -1,35 +1,31 @@
 {
-  "manifest_version": 2,
-  "name": "Key Jump keyboard navigation",
-  "description": "Hit-a-Hint style keyboard navigation. No mouse needed to click on links and stuff.",
-  "version": "5.4.0",
-  "author": "Kenneth Sundqvist <kenneth@kesu.se>",
-  "homepage_url": "https://github.com/KennethSundqvist/key-jump-browser-extension",
-  "icons": {
-    "16": "icon16.png",
-    "48": "icon48.png",
-    "128": "icon128.png"
-  },
-  "permissions": ["storage"],
-  "options_ui": {
-    "page": "options.html",
-    "chrome_style": true
-  },
+  "manifest_version": 3,
+  "name": "Key Jump",
+  "version": "1.0.0",
+  "description": "Navigate web pages using keyboard shortcuts",
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
   "background": {
-    "scripts": ["background.js"]
+    "service_worker": "background.js"
   },
   "content_scripts": [
     {
-      "matches": ["*://*/*", "ftp://*/*"],
-      "all_frames": false,
-      "run_at": "document_start",
+      "matches": ["<all_urls>"],
       "js": ["bootstrap-state.js", "content.js"],
-      "css": ["content.css"]
+      "css": ["content.css"],
+      "run_at": "document_end"
     }
   ],
-  "browser_specific_settings": {
-    "gecko": {
-      "id": "keyjump@kesu.se"
-    }
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Key Jump"
+  },
+  "options_page": "options.html",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
   }
 }

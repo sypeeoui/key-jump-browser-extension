@@ -26,20 +26,23 @@
 .KEYJUMP_hint {
   transition: opacity 0.2s;
   position: absolute;
-  padding: 2px 3px;
+  padding: 4px 6px;
   color: var(--KEYJUMP-color-text);
   background: var(--KEYJUMP-color-bg);
   border: 1px solid var(--KEYJUMP-color-border);
-  border-radius: 2px;
+  border-radius: 3px;
   box-shadow: var(--KEYJUMP-shadow-highlight), var(--KEYJUMP-shadow-drop);
-  font: 13px/1 'Helvetica Neue', Helvetica, Arial, sans-serif;
-  letter-spacing: 1px;
-  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.2);
+  font: bold 12px/1 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  letter-spacing: 0.5px;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
   white-space: nowrap;
+  min-width: 16px;
+  text-align: center;
+  user-select: none;
 }
 
 .KEYJUMP_filtered .KEYJUMP_hint {
-  opacity: 0;
+  opacity: 0.3;
 }
 
 .KEYJUMP_filtered .KEYJUMP_match {

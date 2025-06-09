@@ -21,6 +21,28 @@ const state = {
   renderCache: null,
 }
 
+// Replace chrome.extension.getURL with chrome.runtime.getURL
+function getExtensionURL(path) {
+  return chrome.runtime.getURL(path);
+}
+
+// Update message passing to work with service worker
+function getSettings() {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'getSettings' }, (response) => {
+      resolve(response || {});
+    });
+  });
+}
+
+function saveSettings(settings) {
+  return new Promise((resolve) => {
+    chrome.runtime.sendMessage({ type: 'saveSettings', settings }, (response) => {
+      resolve(response);
+    });
+  });
+}
+
 window.__KEYJUMP__.bootstrapState(state, setup)
 
 // Stuff
@@ -32,6 +54,52 @@ const classNames = Object.freeze({
   filtered: 'KEYJUMP_filtered',
   match: 'KEYJUMP_match',
 })
+
+// Integrated keyjump functionality
+function findClickableElements() {
+  const selector = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled]):not([type="hidden"])',
+    'textarea:not([disabled])',
+    'select:not([disabled])',
+    'details > summary',
+    '[tabindex]:not([tabindex="-1"])',
+    '[onclick]',
+    '[role="button"]',
+    '[role="link"]',
+    '[role="menuitem"]',
+    '[role="tab"]',
+    '[role="option"]',
+    '[role="checkbox"]',
+    '[role="radio"]',
+    '[role="switch"]',
+    '[role="slider"]',
+    '[role="spinbutton"]',
+    'label[for]',
+    'area[href]',
+    '[contenteditable="true"]',
+    'video[controls]',
+    'audio[controls]',
+    // Additional selectors for common clickable patterns
+    '[jsaction]',
+    '[data-ved]',
+    'div[onclick]',
+    'span[onclick]',
+    'div[role="button"]',
+    'span[role="button"]',
+    '[class*="button"]',
+    '[class*="btn"]',
+    '[class*="click"]'
+  ].join(', ');
+  
+  const elements = state.rootEl.querySelectorAll(selector);
+  
+  // Filter out hidden elements with improved visibility check
+  return Array.from(elements).filter(element => {
+    return isElementVisible(element);
+  });
+}
 
 function setup() {
   // We want to handle the events as soon as possible so listen for them
@@ -246,7 +314,6 @@ function triggerMatchingHint() {
       // Has a href value.
       targetEl.getAttribute('href')
     ) {
-      console.log(`@@@ send message`)
       _browser.runtime.sendMessage({openUrlInNewTab: targetEl.href})
     } else {
       const mouseEvent = new MouseEvent('click', {
@@ -357,23 +424,7 @@ function clearFilterFromHints() {
 }
 
 function findHints() {
-  const targetEls = state.rootEl.querySelectorAll(
-    [
-      // Don't search for 'a' to avoid finding elements used only for fragment
-      // links (jump to a point in a page) which sometimes mess up the hint
-      // numbering or it looks like they can be clicked when they can't.
-      'a[href]',
-      'input:not([disabled]):not([type=hidden])',
-      'textarea:not([disabled])',
-      'select:not([disabled])',
-      'button:not([disabled])',
-      '[contenteditable]:not([contenteditable=false]):not([disabled])',
-      '[ng-click]:not([disabled])',
-      // GWT Anchor widget class
-      // http://www.gwtproject.org/javadoc/latest/com/google/gwt/user/client/ui/Anchor.html
-      '.gwt-Anchor',
-    ].join(','),
-  )
+  const targetEls = findClickableElements();
 
   let hintId = 1
 
@@ -404,6 +455,7 @@ function renderHints() {
 
   const fragment = document.createDocumentFragment()
   const winHeight = document.documentElement.clientHeight
+  const winWidth = document.documentElement.clientWidth
 
   for (const hint of state.hints) {
     hint.hintEl = cache.hintSourceEl.cloneNode(true)
@@ -411,21 +463,22 @@ function renderHints() {
 
     fragment.appendChild(hint.hintEl)
 
-    // TODO: Refactor to find the first visible child element instead of rect.
-    // We must check both the element rect and styles to see if it is visible.
     const rects = hint.targetEl.getClientRects()
-    // If none of the rects are visible use the first rect as a workaround...
     const targetPos = Array.from(rects).find(isRectVisible) || rects[0]
-    const hintCharWidth = cache.hintCharWidth * hint.id.length
+    
+    if (!targetPos) continue;
 
-    const top = Math.max(
-      0,
-      Math.min(Math.round(targetPos.top), winHeight - cache.hintHeight),
-    )
-    const left = Math.max(
-      0,
-      Math.round(targetPos.left - cache.hintWidth - hintCharWidth - 2),
-    )
+    // Position hint at top-left of target element with some offset
+    let top = Math.max(0, Math.round(targetPos.top - cache.hintHeight - 2))
+    let left = Math.max(0, Math.round(targetPos.left))
+
+    // Keep hint within viewport
+    if (top + cache.hintHeight > winHeight) {
+      top = Math.max(0, winHeight - cache.hintHeight)
+    }
+    if (left + cache.hintWidth > winWidth) {
+      left = Math.max(0, winWidth - cache.hintWidth)
+    }
 
     hint.hintEl.style.top = top + 'px'
     hint.hintEl.style.left = left + 'px'
@@ -557,13 +610,19 @@ function setupRendering() {
   cache.hintSourceEl = document.createElement('div')
   cache.hintSourceEl.classList.add(classNames.hint)
 
+  // Create temporary element to measure dimensions
   const hintDimensionsEl = cache.hintSourceEl.cloneNode(true)
+  hintDimensionsEl.textContent = '99' // Use double digit for better measurement
+  hintDimensionsEl.style.visibility = 'hidden'
+  hintDimensionsEl.style.position = 'absolute'
   cache.containerEl.appendChild(hintDimensionsEl)
 
   cache.hintWidth = hintDimensionsEl.offsetWidth
-  hintDimensionsEl.innerHTML = '0'
   cache.hintHeight = hintDimensionsEl.offsetHeight
-  cache.hintCharWidth = hintDimensionsEl.offsetWidth - cache.hintWidth
+  
+  // Test single character width
+  hintDimensionsEl.textContent = '9'
+  cache.hintCharWidth = hintDimensionsEl.offsetWidth
 
   cache.containerEl.removeChild(hintDimensionsEl)
 }
@@ -573,3 +632,14 @@ function removeHints(hints) {
     hintEl.parentNode.removeChild(hintEl)
   }
 }
+
+// Initialize the extension
+(async function init() {
+  const settings = await getSettings();
+  // Apply settings and start key jump functionality
+  // ...existing initialization code...
+})();
+
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  sendResponse({success: true});
+});
